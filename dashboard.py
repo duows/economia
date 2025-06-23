@@ -26,6 +26,7 @@ PAISES_DASHBOARD = sorted([MAPA_NOMES_PAISES.get(p, p) for p in PAISES_INTERESSE
 ANOS_RANGE = (2010, 2023)
 
 # --- 2. FUNÇÕES PARA PROCESSAMENTO DE DADOS ---
+# (As funções de processamento de dados permanecem as mesmas, não precisam de alteração)
 def processar_df_banco_mundial(df_raw, nome_novo_indicador, paises_interesse_original_wb, anos_range_tuple, mapa_nomes):
     cols_anos = [str(ano) for ano in range(anos_range_tuple[0], anos_range_tuple[1] + 1)]
     cols_anos_existentes = [col for col in cols_anos if col in df_raw.columns]
@@ -66,7 +67,7 @@ def ler_csv_local(caminho_arquivo, nome_novo_indicador, paises_interesse_origina
         if df_processed.empty:
             msg = f"ℹ️ Nenhum dado processado para '{nome_novo_indicador}' do arquivo '{os.path.basename(caminho_arquivo)}' para os países/anos de interesse."
             if 'Country Name' in df_raw.columns and df_raw['Country Name'].isin(paises_interesse_original_wb).any():
-                 msg = f"⚠️ Países de interesse existem em '{os.path.basename(caminho_arquivo)}' para '{nome_novo_indicador}', mas o processamento resultou em dados vazios (verifique anos/valores no CSV)."
+                msg = f"⚠️ Países de interesse existem em '{os.path.basename(caminho_arquivo)}' para '{nome_novo_indicador}', mas o processamento resultou em dados vazios (verifique anos/valores no CSV)."
             print(msg)
             return None, msg
         
@@ -82,8 +83,6 @@ def ler_csv_local(caminho_arquivo, nome_novo_indicador, paises_interesse_origina
         print(error_message)
         return None, error_message
 
-# Lista de arquivos a serem carregados.
-# Verifique se os nomes dos arquivos aqui correspondem EXATAMENTE aos nomes na pasta 'dados_baixados'.
 arquivos_a_carregar = {
     'banco_mundial_pib_per_capita_ppp.csv': 'PIB per capita (PPP Dólar)',
     'banco_mundial_gasto_educ_perc_pib.csv': 'Gasto em Educação (% PIB)',
@@ -105,9 +104,6 @@ def carregar_todos_os_dados():
         mensagens_status.append(msg)
         if df_indicador is not None and not df_indicador.empty:
             lista_dfs_carregados.append(df_indicador)
-
-    # --- SEÇÃO REMOVIDA: Gasto por Aluno ---
-    # O código para carregar 'ocde_gasto_aluno_ppp.csv' e os dados pontuais foi removido.
     
     anos_todos = list(range(ANOS_RANGE[0], ANOS_RANGE[1] + 1))
     df_final = pd.DataFrame([(pais, ano) for pais in PAISES_DASHBOARD for ano in anos_todos], columns=['País', 'Ano'])
@@ -116,13 +112,10 @@ def carregar_todos_os_dados():
         print("Nenhum DataFrame de indicador foi carregado de arquivos.")
         return df_final, mensagens_status
 
-    # Usando um loop para fazer o merge de cada df da lista no df_final
     for df_to_merge in lista_dfs_carregados:
-        # Garante que as colunas de junção sejam do tipo correto e remove duplicatas
         df_to_merge['Ano'] = pd.to_numeric(df_to_merge['Ano'], errors='coerce').dropna().astype(int)
         df_to_merge = df_to_merge.dropna(subset=['País'])
         df_to_merge = df_to_merge.drop_duplicates(subset=['País', 'Ano'], keep='last')
-
         df_final = pd.merge(df_final, df_to_merge, on=['País', 'Ano'], how='left')
     
     df_final = df_final.sort_values(by=['País', 'Ano']).reset_index(drop=True)
@@ -156,7 +149,7 @@ else:
         default_countries = [paises_disponiveis_no_df[0]]
 
     paises_selecionados_gerais = st.sidebar.multiselect( 
-        "Selecione os Países:", paises_disponiveis_no_df, default=default_countries, key="paises_gerais_v7"
+        "Selecione os Países:", paises_disponiveis_no_df, default=default_countries, key="paises_gerais_v8"
     )
 
     anos_disponiveis_no_df = sorted(df_dados['Ano'].dropna().astype(int).unique(), reverse=True)
@@ -164,14 +157,13 @@ else:
     if anos_disponiveis_no_df:
         default_ano_index = 0
         try: 
-            # Tenta definir 2022 como padrão, se não, o mais recente.
             if 2022 in anos_disponiveis_no_df:
                 default_ano_index = anos_disponiveis_no_df.index(2022)
         except ValueError:
             pass 
 
         ano_selecionado_pontual = st.sidebar.selectbox(
-            "Selecione o Ano (para comparações pontuais e correlação):", anos_disponiveis_no_df, index=default_ano_index, key="ano_pontual_corr_v3"
+            "Selecione o Ano (para comparações pontuais e correlação):", anos_disponiveis_no_df, index=default_ano_index, key="ano_pontual_corr_v8"
         )
     else:
         st.sidebar.warning("Nenhum ano disponível.")
@@ -180,7 +172,7 @@ else:
 
     if not paises_selecionados_gerais or ano_selecionado_pontual is None:
         if not (df_dados.empty or len(df_dados.columns) <=2):
-             st.warning("Selecione países e um ano para visualizar as comparações pontuais.")
+            st.warning("Selecione países e um ano para visualizar as comparações pontuais.")
     else:
         df_filtrado_ano_pontual = df_dados[
             (df_dados['País'].isin(paises_selecionados_gerais)) &
@@ -189,8 +181,8 @@ else:
         
         st.markdown("---")
         st.header(f"Comparativo Pontual para o Ano de {ano_selecionado_pontual}")
-        st.subheader("Tabela de Dados Comparativa")
         
+        st.subheader("Tabela de Dados Comparativa")
         if not df_filtrado_ano_pontual.empty:
             df_tabela_display = df_filtrado_ano_pontual.dropna(subset=indicadores_disponiveis_df, how='all')
             if not df_tabela_display.empty:
@@ -201,41 +193,55 @@ else:
         else:
             st.info(f"Nenhum dado para a combinação de filtros no ano {ano_selecionado_pontual}.")
 
-        col_vis1, col_vis2 = st.columns(2)
+        # --- ALTERAÇÃO PRINCIPAL: DE COLUNAS PARA ABAS ---
+        # Troca st.columns por st.tabs para melhor visualização em mobile
+        tab_barras, tab_dispersao = st.tabs(["📊 Comparativo por Indicador", "📈 Análise de Correlação"])
+        
         indicadores_com_dados_ano_pontual = [ind for ind in indicadores_disponiveis_df if ind in df_filtrado_ano_pontual.columns and df_filtrado_ano_pontual[ind].notna().any()]
 
-        with col_vis1:
+        with tab_barras:
             st.subheader("Comparativo por Indicador (Gráfico de Barras)")
             if indicadores_com_dados_ano_pontual:
-                indicador_barras = st.selectbox("Indicador:", indicadores_com_dados_ano_pontual, key="bar_ind_pontual_v7")
+                indicador_barras = st.selectbox("Indicador:", indicadores_com_dados_ano_pontual, key="bar_ind_pontual_v8")
                 if indicador_barras:
                     df_barras_valid = df_filtrado_ano_pontual.dropna(subset=[indicador_barras])
                     if not df_barras_valid.empty:
                         fig_barras = px.bar(df_barras_valid.sort_values(by=indicador_barras, ascending=False),
-                            x='País', y=indicador_barras, color='País', title=f"{indicador_barras} em {ano_selecionado_pontual}")
+                                            x='País', y=indicador_barras, color='País', 
+                                            title=f"{indicador_barras} em {ano_selecionado_pontual}")
+                        # AJUSTE RESPONSIVO
+                        fig_barras.update_layout(
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                            font=dict(size=10)
+                        )
                         st.plotly_chart(fig_barras, use_container_width=True)
                     else: st.info(f"Sem dados para '{indicador_barras}' nos filtros atuais.")
             else: st.info("Sem indicadores com dados para este ano/seleção (gráfico de barras).")
 
-        with col_vis2:
+        with tab_dispersao:
             st.subheader("Análise de Correlação (Gráfico de Dispersão)")
             indicadores_numericos_scatter = [ind for ind in indicadores_com_dados_ano_pontual if pd.api.types.is_numeric_dtype(df_filtrado_ano_pontual[ind])]
             if len(indicadores_numericos_scatter) >= 2:
-                # Tenta pré-selecionar 'PIB per capita' se estiver disponível
                 idx_x = 0
                 if 'PIB per capita (PPP Dólar)' in indicadores_numericos_scatter:
                     idx_x = indicadores_numericos_scatter.index('PIB per capita (PPP Dólar)')
                 
-                indicador_x_scatter = st.selectbox("Indicador Eixo X:", indicadores_numericos_scatter, index=idx_x, key="scatter_x_pontual_v7")
+                indicador_x_scatter = st.selectbox("Indicador Eixo X:", indicadores_numericos_scatter, index=idx_x, key="scatter_x_pontual_v8")
                 indicador_y_scatter_opcoes = [ind for ind in indicadores_numericos_scatter if ind != indicador_x_scatter]
+                
                 if indicador_y_scatter_opcoes:
-                    indicador_y_scatter = st.selectbox("Indicador Eixo Y:", indicador_y_scatter_opcoes, index=0, key="scatter_y_pontual_v7")
+                    indicador_y_scatter = st.selectbox("Indicador Eixo Y:", indicador_y_scatter_opcoes, index=0, key="scatter_y_pontual_v8")
                     if indicador_x_scatter and indicador_y_scatter: 
                         df_scatter_valid = df_filtrado_ano_pontual.dropna(subset=[indicador_x_scatter, indicador_y_scatter])
                         if not df_scatter_valid.empty:
                             fig_dispersao = px.scatter(df_scatter_valid, x=indicador_x_scatter, y=indicador_y_scatter, color='País',
-                                size=indicador_x_scatter, hover_name='País', text='País', title=f"Correlação: {indicador_x_scatter} vs. {indicador_y_scatter} ({ano_selecionado_pontual})")
-                            fig_dispersao.update_traces(textposition='top center')
+                                                    size=indicador_x_scatter, hover_name='País', 
+                                                    title=f"Correlação: {indicador_x_scatter} vs. {indicador_y_scatter} ({ano_selecionado_pontual})")
+                            # AJUSTE RESPONSIVO: Removido 'text' para evitar poluição e ajustado layout
+                            fig_dispersao.update_layout(
+                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                                font=dict(size=10)
+                            )
                             st.plotly_chart(fig_dispersao, use_container_width=True)
                         else: st.info(f"Sem dados completos para '{indicador_x_scatter}' vs '{indicador_y_scatter}'.")
                 else: st.info("Precisa de pelo menos um outro indicador para o eixo Y.")
@@ -253,8 +259,8 @@ else:
         st.subheader("Evolução de Múltiplos Indicadores para um País")
         pais_analise_multi_ind = st.selectbox(
             "Selecione UM País:",
-            paises_selecionados_gerais, # Mostra apenas os países já selecionados na sidebar
-            key="pais_multi_ind_v7" 
+            paises_selecionados_gerais, 
+            key="pais_multi_ind_v8" 
         )
         if pais_analise_multi_ind:
             df_pais_selecionado_multi_ind = df_dados[df_dados['País'] == pais_analise_multi_ind].copy()
@@ -265,7 +271,7 @@ else:
                     "Selecione indicadores para visualizar (um gráfico por indicador):",
                     indicadores_pais_multi_ind,
                     default=indicadores_pais_multi_ind[:min(2, len(indicadores_pais_multi_ind))], 
-                    key="select_multi_ind_v7" 
+                    key="select_multi_ind_v8" 
                 )
                 
                 if indicadores_plot_multi_ind:
@@ -274,7 +280,9 @@ else:
                         if not df_indicador_especifico.empty:
                             st.markdown(f"#### Evolução de **{indicador}** para **{pais_analise_multi_ind}**")
                             fig_individual = px.line(df_indicador_especifico, x='Ano', y=indicador,
-                                                     title=f"Evolução de {indicador} para {pais_analise_multi_ind}", markers=True)
+                                                    title=f"Evolução de {indicador} para {pais_analise_multi_ind}", markers=True)
+                            # AJUSTE RESPONSIVO
+                            fig_individual.update_layout(font=dict(size=10), margin=dict(l=40, r=20, t=40, b=40))
                             st.plotly_chart(fig_individual, use_container_width=True)
                         else:
                             st.info(f"Nenhum dado válido para o indicador '{indicador}' para {pais_analise_multi_ind}.")
@@ -288,12 +296,12 @@ else:
         indicadores_com_dados_series_gerais = [ind for ind in indicadores_disponiveis_df if ind in df_filtrado_series_gerais.columns and df_filtrado_series_gerais[ind].notna().any()]
 
         if not indicadores_com_dados_series_gerais:
-             st.info("Nenhum indicador com dados disponíveis para os países selecionados.")
+            st.info("Nenhum indicador com dados disponíveis para os países selecionados.")
         else:
             indicador_serie_heatmap = st.selectbox(
                 "Selecione UM Indicador para Tabela de Série Temporal e Heatmap:",
                 indicadores_com_dados_series_gerais,
-                key="indicador_heatmap_v7"
+                key="indicador_heatmap_v8"
             )
             if indicador_serie_heatmap:
                 df_serie_filtrada_indicador = df_filtrado_series_gerais[['País', 'Ano', indicador_serie_heatmap]].dropna(subset=[indicador_serie_heatmap])
@@ -313,7 +321,7 @@ else:
                         fig_heatmap = px.imshow(df_serie_pivot_table, labels=dict(x="Ano", y="País", color=indicador_serie_heatmap),
                                                 text_auto=".2f", aspect="auto", color_continuous_scale=px.colors.sequential.Viridis)
                         fig_heatmap.update_xaxes(side="bottom")
-                        fig_heatmap.update_layout(title_text=f"Heatmap: {indicador_serie_heatmap} ao longo dos Anos")
+                        fig_heatmap.update_layout(title_text=f"Heatmap: {indicador_serie_heatmap} ao longo dos Anos", font=dict(size=10))
                         st.plotly_chart(fig_heatmap, use_container_width=True)
                     else:
                         st.info(f"Não há dados suficientes para gerar o heatmap.")
@@ -342,9 +350,10 @@ else:
                 matriz_corr = df_para_corr_numeric.corr()
                 if not matriz_corr.empty:
                     fig_corr_heatmap = px.imshow(matriz_corr, text_auto=".2f", aspect="auto",
-                                                 color_continuous_scale=px.colors.diverging.RdBu, zmin=-1, zmax=1)
+                                                color_continuous_scale=px.colors.diverging.RdBu, zmin=-1, zmax=1)
                     fig_corr_heatmap.update_layout(
-                        title_text=f"Matriz de Correlação dos Indicadores ({ano_selecionado_pontual}, Países: {', '.join(paises_selecionados_gerais)})"
+                        title_text=f"Matriz de Correlação ({ano_selecionado_pontual}, Países: {', '.join(paises_selecionados_gerais)})",
+                        font=dict(size=10) # Ajuste de fonte
                     )
                     st.plotly_chart(fig_corr_heatmap, use_container_width=True)
                 else:
@@ -353,5 +362,5 @@ else:
                 st.info(f"Não há dados ou indicadores numéricos suficientes para os filtros selecionados para calcular uma matriz de correlação (necessário ≥2 indicadores e ≥2 países com dados).")
 
     st.markdown("---")
-    st.markdown("Dashboard desenvolvido para fins de demonstração.")
-    st.markdown("Fonte dos dados: Arquivos CSV locais do Banco Mundial.")
+    st.markdown("Dashboard desenvolvido para fins de demonstração na máteria de economia.")
+    st.markdown("Fonte dos dados: Arquivos CSV locais retirados do Banco Mundial.")
